@@ -30,10 +30,19 @@ function build_simple {
     local name_version="${name}-${version}"
     local archive="${name_version}.${ext}"
     fetch_unpack "$url/$archive"
-    (cd "$name_version" \
-        && ./configure --prefix="$BUILD_PREFIX" \
-        && make -j4 \
-        && make install)
+
+    if [ -n "${IS_MACOS:-}" ]; then
+      (cd "$name_version" \
+          && ./configure --prefix="$BUILD_PREFIX" \
+          && make -j4 \
+          && sudo make install)
+    else
+      (cd "$name_version" \
+          && ./configure --prefix="$BUILD_PREFIX" \
+          && make -j4 \
+          && make install)
+    fi
+
     touch "${name}-stamp"
 }
 function fetch_unpack {
@@ -99,10 +108,19 @@ function build_jansson {
     echo "building jansson from $JANSSON_DOWNLOAD_URL"
     fetch_unpack "${JANSSON_DOWNLOAD_URL}/${JANSSON_ROOT}.tar.gz"
     check_sha256sum "${ARCHIVE_SDIR:-archives}/${JANSSON_ROOT}.tar.gz" "${JANSSON_HASH}"
-    (cd "${JANSSON_ROOT}" \
-        && ./configure --prefix="$BUILD_PREFIX" \
-        && make -j4 \
-        && make install)
+
+    if [ -n "${IS_MACOS:-}" ]; then
+      (cd "${JANSSON_ROOT}" \
+          && ./configure --prefix="$BUILD_PREFIX" \
+          && make -j4 \
+          && sudo make install)
+    else
+      (cd "${JANSSON_ROOT}" \
+          && ./configure --prefix="$BUILD_PREFIX" \
+          && make -j4 \
+          && make install)
+    fi
+
     touch jansson-stamp
 }
 

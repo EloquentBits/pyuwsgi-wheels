@@ -162,7 +162,7 @@ on GitHub.
 """
 
 setup(
-    name='pyuwsgi',
+    name='pikesquares-pyuwsgi',
     license='GPL2',
     version=uwsgiconfig.uwsgi_version + "",
     author='Unbit',
