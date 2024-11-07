@@ -110,6 +110,7 @@ jobs:
           output-dir: dist
           package-dir: ./${{ needs.build_sdist.outputs.sdist_name }}
         env:
+          CIBW_BUILD: cp312-*
           CIBW_ARCHS: ${{ matrix.arch }}
           CIBW_SKIP: cp36-* cp38-macosx_arm64 pp*
           CIBW_ENVIRONMENT: UWSGI_PROFILE=pikesquares
