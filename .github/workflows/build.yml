@@ -44,7 +44,7 @@ jobs:
         #- {os: ubuntu-latest, arch: aarch64}
         #- {os: ubuntu-latest, arch: i686}
         - {os: ubuntu-latest, arch: x86_64}
-        - {os: macos-11, arch: x86_64}
+        - {os: macos-13, arch: x86_64}
         - {os: macos-14, arch: arm64}
       fail-fast: false
 
@@ -118,7 +118,7 @@ jobs:
           CIBW_TEST_COMMAND: "pyuwsgi --help"
           CIBW_BEFORE_BUILD_MACOS: "find . -name '*.o' -delete && IS_MACOS=1 ./pre_build.sh"
           CIBW_BEFORE_BUILD_LINUX: "find . -name '*.o' -delete && ./pre_build.sh && (yum install -y zlib-devel openssl-devel zeromq-devel libsqlite3x-devel.x86_64 || apk add zlib-dev openssl-dev zeromq-dev sqlite-dev)"
-
+          MACOSX_DEPLOYMENT_TARGET: 13.0
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: "\
                   delocate-listdeps --depending {wheel} && \
                   delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -vv {wheel}"
