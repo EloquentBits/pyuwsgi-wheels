@@ -1,7 +1,11 @@
 ---
 name: Build
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main, test-me-*]
+    tags: '*'
+  pull_request:
 
 jobs:
   build_sdist:
@@ -14,90 +18,47 @@ jobs:
         with:
           submodules: true
 
-      - name: Patch packaging
-        run: ./patch-uwsgi-packaging.sh uwsgi
-
       - name: Build sdist
         id: build_sdist
         run: |
-          git submodule update --init
           make sdist
-          echo "sdist_name=pikesquares-pyuwsgi-$(make print-version)" >> $GITHUB_OUTPUT
+          echo "sdist_name=pyuwsgi-$(bin/package-version)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-sdist
           path: dist
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: pre_build
           path: pre_build.sh
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: pikesquares_profile
-          path: pikesquares.ini
-
   build_wheels:
-
-    # https://github.com/actions/runner-images/blob/main/images/macos/macos-14-Readme.md
-    # https://github.com/actions/runner-images/blob/main/images/macos/macos-14-arm64-Readme.md
-    #
     name: Build wheels for ${{ matrix.os }} ${{ matrix.arch }}
     needs: [build_sdist]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [linux, macos]
-        arch: [x86_64, arm64]
         include:
-          - {
-              "os": "linux", 
-              "py": "cp312", 
-              "arch": "x86_64", 
-              "runner": "ubuntu-latest", 
-              "cibw_build": "cp312-manylinux_x86_64", 
-              "cibw_wheel_suffix": "manylinux_2_17_x86_64.manylinux2014_x86_64",
-              "pip-cache-path": "~/.cache/pip" }
-          - {
-              "os": "macos", 
-              "py": "cp312", 
-              "arch": "x86_64", 
-              "runner": "macos-14-large", 
-              "cibw_build": "cp312-macosx_x86_64", 
-              "cibw_wheel_suffix": "macosx_10_9_x86_64",
-              "pip-cache-path": "~/Library/Caches/pip" }
-          - {
-              "os": "macos", 
-              "py": "cp312", 
-              "arch": "arm64", 
-              "runner": "macos-14", 
-              "cibw_build": "cp312-macosx_arm64",  
-              "cibw_wheel_suffix": "macosx_11_0_arm64",
-              "pip-cache-path": "~/Library/Caches/pip"}
-        exclude:
-          - os: linux
-            arch: arm64
-
+        - {os: ubuntu-latest, arch: aarch64}
+        - {os: ubuntu-latest, arch: i686}
+        - {os: ubuntu-latest, arch: x86_64}
+        - {os: macos-13, arch: x86_64}
+        - {os: macos-14, arch: arm64}
       fail-fast: false
 
     steps:
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: dist-sdist
           path: dist
 
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: pre_build
           path: .
-
-      - uses: actions/download-artifact@v3
-        with:
-          name: pikesquares_profile
-          path: buildconf
 
       - name: Unpack sdist
         run: |
@@ -106,17 +67,14 @@ jobs:
           chmod +x pre_build.sh
 
       - name: Set up QEMU
-        if: runner.os == 'Linux'
+        if: matrix.arch == 'aarch64'
         uses: docker/setup-qemu-action@v1
         with:
           platforms: all
 
-      #- name: install deps linux x86_64
-      #  if: ${{ matrix.os == 'linux' && matrix.arch == 'x86_64'}}
-      #  shell: bash
-      #  run: |
-      #    python3 -m pip install --user pipx
-      #    python3 -m pipx ensurepath
+      - name: avoid homebrew pcre2
+        if: matrix.os == 'macos-14'
+        run: brew unlink pcre2
 
       - name: install deps from homebrew for x86_64
         if: ${{ matrix.os == 'macos' && matrix.arch == 'x86_64'}}
@@ -130,78 +88,58 @@ jobs:
         shell: bash
         run: |
           brew install autoconf libtool automake
-          #brew install autoconf libtool automake 
 
       #- name: setup Ccache
       #  uses: hendrikmuhs/ccache-action@main
       #  with:
       #    key: ${{ github.job }}-${matrix.os}-${{ matrix.arch }}-${{ matrix.py }}
       #
-      - uses: actions/cache@v3
-        id: pyuwsgi-wheel
-        name: cache wheel
-        with:
-          path: dist
-          key: ${{ needs.build_sdist.outputs.sdist_name }}-${{ matrix.os }}-${{ matrix.arch }}
+      #- uses: actions/cache@v3
+      #  id: pyuwsgi-wheel
+      #  name: cache wheel
+      #  with:
+      #    path: dist
+      #    key: ${{ needs.build_sdist.outputs.sdist_name }}-${{ matrix.os }}-${{ matrix.arch }}
 
         #pyuwsgi-2.0.23.post0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
         #pyuwsgi-2.0.23.post0-cp312-cp312-macosx_11_0_arm64.whl
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.5
-        if: ${{ steps.pyuwsgi-wheel.outputs.cache-hit != 'true' }}  
+        uses: pypa/cibuildwheel@v2.20.0
         with:
           output-dir: dist
           package-dir: ./${{ needs.build_sdist.outputs.sdist_name }}
         env:
-          #DISTUTILS_C_COMPILER_LAUNCHER: ccache
-          #PATH: "usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
-          CIBW_BUILD: ${{ matrix.py }}-*
-          CIBW_ARCHS_LINUX: x86_64
-          CIBW_ARCHS_MACOS: ${{ matrix.arch }}
-          CIBW_SKIP: ${{ matrix.py }}-musllinux*
-          # cross-compile for arm64 on macos isn't working yet
-          # https://github.com/lincolnloop/pyuwsgi-wheels/issues/18
-          # CIBW_ARCHS_MACOS: x86_64 arm64
-          # tesing on emulated arm64 isn't supported for MacOS
-          # CIBW_TEST_SKIP: "*-macosx_arm64"
-          CIBW_ENVIRONMENT: APPEND_VERSION=".post0" UWSGI_PROFILE=pikesquares
+          CIBW_ARCHS: ${{ matrix.arch }}
+          CIBW_SKIP: cp36-* cp38-macosx_arm64 pp*
+          CIBW_ENVIRONMENT: UWSGI_PROFILE=pikesquares
           CIBW_ENVIRONMENT_MACOS: LDFLAGS="-L/opt/homebrew/opt/openssl@1.3/lib" CPPFLAGS="-I/opt/homebrew/opt/openssl@1.3/include" PKG_CONFIG_PATH="/opt/homebrew/opt/openssl@1.3/lib/pkgconfig"
-          CIBW_TEST_COMMAND: "pyuwsgi --help | head -30"
+          CIBW_TEST_COMMAND: "pyuwsgi --help"
           CIBW_BEFORE_BUILD_MACOS: "find . -name '*.o' -delete && IS_MACOS=1 ./pre_build.sh"
-          CIBW_BEFORE_BUILD_LINUX: "find . -name '*.o' -delete && ./pre_build.sh && (yum install -y zlib-devel openssl-devel zeromq-devel libsqlite3x-devel.x86_64 || apk add zlib-dev)"
+          CIBW_BEFORE_BUILD_LINUX: "find . -name '*.o' -delete && ./pre_build.sh && (yum install -y zlib-devel || apk add zlib-dev)"
+
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: "\
                   delocate-listdeps --depending {wheel} && \
                   delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -vv {wheel}"
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: dist-${{ matrix.os }}-${{ matrix.arch }}
           path: dist
-
-    # - name: Publish package distributions to PyPI
-    #    if: ${{ steps.pyuwsgi-wheel-linux-x86_64.outputs.cache-hit != 'true' }}  
-    #    uses: pypa/gh-action-pypi-publish@release/v1
-    #    with:
-    #      print-hash: true
-    #      verbose: true
-    #      user: ${{ secrets.PYPI_USER }}
-    #      password: ${{ secrets.PYPI_PASSWORD }}
-    #      repository-url: ${{ secrets.PYPI_REPO_URL }}
-    #      packages-dir: dist/pyuwsgi-2.0.23.post0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-
   verify:
     name: Verify wheels
     runs-on: ubuntu-latest
     needs: [build_wheels]
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: dist
+          pattern: dist-*
           path: dist
+          merge-multiple: true
+      - name: Verify sdist
+        run: ls -lh dist/*.tar.gz
       - name: Verify wheels
-        run: ls -lh dist
-
+        run: ls -lh dist/*.whl
   pypi-publish:
     #if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     needs: [verify]
@@ -212,12 +150,12 @@ jobs:
     #  url: https://pypi.org/p/pyuwsgi
     permissions:
       id-token: write
-
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: dist
+          pattern: dist-*
           path: dist
+          merge-multiple: true
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
