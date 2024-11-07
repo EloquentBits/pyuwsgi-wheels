@@ -44,7 +44,7 @@ jobs:
         #- {os: ubuntu-latest, arch: aarch64}
         #- {os: ubuntu-latest, arch: i686}
         - {os: ubuntu-latest, arch: x86_64}
-        - {os: macos-13, arch: x86_64}
+        - {os: macos-14, arch: x86_64}
         - {os: macos-14, arch: arm64}
       fail-fast: false
 
@@ -112,7 +112,7 @@ jobs:
         env:
           CIBW_BUILD: cp312-*
           CIBW_ARCHS: ${{ matrix.arch }}
-          CIBW_SKIP: cp36-* cp38-macosx_arm64 pp*
+          CIBW_SKIP: cp36-* cp38-macosx_arm64 pp* cp312-musllinux*
           CIBW_ENVIRONMENT: UWSGI_PROFILE=pikesquares
           CIBW_ENVIRONMENT_MACOS: LDFLAGS="-L/opt/homebrew/opt/openssl@1.3/lib" CPPFLAGS="-I/opt/homebrew/opt/openssl@1.3/include" PKG_CONFIG_PATH="/opt/homebrew/opt/openssl@1.3/lib/pkgconfig"
           CIBW_TEST_COMMAND: "pyuwsgi --help"
