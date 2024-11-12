@@ -77,14 +77,14 @@ jobs:
         run: brew unlink pcre2
 
       - name: install deps from homebrew for x86_64
-        if: ${{ matrix.os == 'macos' && matrix.arch == 'x86_64'}}
+        if: ${{ matrix.os == 'macos-13' && matrix.arch == 'x86_64'}}
         shell: bash
         run: |
           brew install pipx
         #brew install zeromq jansson pcre pipx
 
       - name: install deps from homebrew for arm64
-        if: ${{ matrix.os == 'macos' && matrix.arch == 'arm64'}}
+        if: ${{ matrix.os == 'macos-14' && matrix.arch == 'arm64'}}
         shell: bash
         run: |
           brew install autoconf libtool automake
